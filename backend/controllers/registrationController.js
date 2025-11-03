@@ -1,6 +1,6 @@
 const Registration = require("../models/Registration");
 const Elective = require("../models/Elective");
-const User = require("../models/User");
+const Student = require("../models/Student");
 
 // Student chooses elective
 exports.registerElective = async (req, res) => {
@@ -8,7 +8,7 @@ exports.registerElective = async (req, res) => {
         const { electiveId } = req.body;
         const studentId = req.user.id; // from JWT
 
-        const student = await User.findById(studentId);
+        const student = await Student.findById(studentId);
         if (!student) return res.status(404).json({ msg: "Student not found" });
 
         const elective = await Elective.findById(electiveId);
@@ -19,14 +19,54 @@ exports.registerElective = async (req, res) => {
             return res.status(400).json({ msg: "Elective not valid for this student" });
         }
 
-        // Prevent multiple registrations
-        const existing = await Registration.findOne({ student: studentId });
+        // Prevent multiple registrations for the same (semester, type, number)
+        const existing = await Registration.findOne({
+            student: studentId,
+            semester: student.semester,
+            electiveType: elective.electiveType,
+            electiveNumber: elective.electiveNumber
+        });
         if (existing) {
-            return res.status(400).json({ msg: "You have already registered for an elective" });
+            return res.status(400).json({ msg: "You have already registered for this elective slot" });
         }
 
-        const newReg = new Registration({ student: studentId, elective: electiveId });
+        const newReg = new Registration({
+            student: studentId,
+            elective: electiveId,
+            semester: student.semester,
+            electiveType: elective.electiveType,
+            electiveNumber: elective.electiveNumber
+        });
         await newReg.save();
+
+        // Optionally reflect in Student document for quick lookup
+        try {
+            await Student.updateOne(
+                { _id: studentId },
+                {
+                    $pull: {
+                        selectedElectives: {
+                            semester: student.semester,
+                            electiveType: elective.electiveType,
+                            electiveNumber: elective.electiveNumber
+                        }
+                    }
+                }
+            );
+            await Student.updateOne(
+                { _id: studentId },
+                {
+                    $addToSet: {
+                        selectedElectives: {
+                            semester: student.semester,
+                            electiveType: elective.electiveType,
+                            electiveNumber: elective.electiveNumber,
+                            elective: elective._id
+                        }
+                    }
+                }
+            );
+        } catch {}
 
         res.status(201).json({ msg: "Elective registered successfully", newReg });
     } catch (err) {
@@ -38,10 +78,10 @@ exports.registerElective = async (req, res) => {
 exports.getMyRegistration = async (req, res) => {
     try {
         const studentId = req.user.id;
-        const reg = await Registration.findOne({ student: studentId }).populate("elective");
-        if (!reg) return res.json({ msg: "No elective registered yet" });
+        const regs = await Registration.find({ student: studentId }).populate("elective");
+        if (!regs || regs.length === 0) return res.json({ msg: "No elective registered yet" });
 
-        res.json(reg);
+        res.json(regs);
     } catch (err) {
         res.status(500).json({ msg: "Server error", error: err.message });
     }
@@ -50,10 +90,10 @@ exports.getMyRegistration = async (req, res) => {
 // Admin: view all registrations for their branch
 exports.getAllRegistrations = async (req, res) => {
     try {
-        const branch = req.userBranch; // From middleware
+        const branch = req.userBranch; // From middleware (admin's branch)
 
-        // Get all students from the admin's branch
-        const students = await User.find({ branch, role: "student" });
+        // Get all students in admin's branch
+        const students = await Student.find({ branch });
         const studentIds = students.map(student => student._id);
 
         // Get registrations for students in this branch, sorted by roll number

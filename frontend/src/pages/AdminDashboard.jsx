@@ -22,14 +22,16 @@ export default function AdminDashboard() {
   const [newElective, setNewElective] = useState({
     name: "",
     code: "",
-    description: "",
+    electiveType: "",
+    electiveNumber: "",
     semester: "",
   });
   const [editingElective, setEditingElective] = useState(null);
   const [editForm, setEditForm] = useState({
     name: "",
     code: "",
-    description: "",
+    electiveType: "",
+    electiveNumber: "",
     semester: "",
   });
   const [excelFile, setExcelFile] = useState(null);
@@ -38,10 +40,19 @@ export default function AdminDashboard() {
   // Filtering state
   const [semesters, setSemesters] = useState([]);
   const [selectedSemester, setSelectedSemester] = useState("");
+  const [electiveTypes, setElectiveTypes] = useState([]);
+  const [selectedElectiveType, setSelectedElectiveType] = useState("");
   const [selectedElective, setSelectedElective] = useState("");
   const [sections, setSections] = useState([]);
   const [selectedSection, setSelectedSection] = useState("");
   const [filteredRegistrations, setFilteredRegistrations] = useState([]);
+
+  const deriveElectiveTypes = (list) => {
+    const set = new Set(
+      (list || []).map((e) => e.electiveType).filter(Boolean)
+    );
+    return Array.from(set).sort();
+  };
 
   const navigate = useNavigate();
 
@@ -103,6 +114,45 @@ export default function AdminDashboard() {
     if (!semester) return;
     const res = await adminAPI.getElectivesBySemester(semester);
     setElectives(res.data);
+    // Fallback: derive types from electives if types not yet loaded
+    if (!electiveTypes.length) {
+      const types = deriveElectiveTypes(res.data);
+      if (types.length) setElectiveTypes(types);
+    }
+  };
+
+  const fetchElectiveTypesBySemester = async (semester) => {
+    if (!semester) return;
+    try {
+      const res = await adminAPI.getElectiveTypesBySemester(semester);
+      const types = res.data || [];
+      if (types.length) {
+        setElectiveTypes(types);
+      } else if (electives.length) {
+        // Fallback if API returns empty
+        const derived = deriveElectiveTypes(electives);
+        setElectiveTypes(derived);
+      } else {
+        setElectiveTypes([]);
+      }
+    } catch (err) {
+      // Fallback to derive from current electives on error
+      if (electives.length) {
+        setElectiveTypes(deriveElectiveTypes(electives));
+      } else {
+        setElectiveTypes([]);
+      }
+    }
+  };
+
+  const fetchElectivesByType = async (type, semester) => {
+    if (!type) return;
+    try {
+      const res = await adminAPI.getElectivesByType(type, semester);
+      setElectives(res.data || []);
+    } catch (err) {
+      setElectives([]);
+    }
   };
 
   const fetchSectionsBySemester = async (semester) => {
@@ -114,6 +164,7 @@ export default function AdminDashboard() {
   const fetchFilteredRegistrations = async () => {
     const params = {};
     if (selectedSemester) params.semester = selectedSemester;
+    if (selectedElectiveType) params.electiveType = selectedElectiveType;
     if (selectedElective) params.electiveId = selectedElective;
     if (selectedSection) params.section = selectedSection;
 
@@ -125,7 +176,13 @@ export default function AdminDashboard() {
     e.preventDefault();
     try {
       await electiveAPI.create(newElective);
-      setNewElective({ name: "", code: "", description: "", semester: "" });
+      setNewElective({
+        name: "",
+        code: "",
+        electiveType: "",
+        electiveNumber: "",
+        semester: "",
+      });
       showToast.success("Elective added successfully!");
       fetchElectives();
     } catch (err) {
@@ -138,7 +195,8 @@ export default function AdminDashboard() {
     setEditForm({
       name: elective.name,
       code: elective.code,
-      description: elective.description || "",
+      electiveType: elective.electiveType || "",
+      electiveNumber: String(elective.electiveNumber || ""),
       semester: elective.semester.toString(),
     });
   };
@@ -275,20 +333,39 @@ export default function AdminDashboard() {
   };
 
   const handleFileChange = (e) => {
-    setExcelFile(e.target.files[0]);
+    const file = e.target.files && e.target.files[0];
+    if (!file) {
+      setExcelFile(null);
+      return;
+    }
+    const isMimeOk = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ].includes(file.type);
+    const isExtOk = /\.(xlsx|xls)$/i.test(file.name || "");
+    if (!(isMimeOk || isExtOk)) {
+      showToast.error("Only .xlsx or .xls files are allowed");
+      e.target.value = ""; // reset input
+      setExcelFile(null);
+      return;
+    }
+    setExcelFile(file);
   };
 
   // Filtering handlers
   const handleSemesterChange = async (semester) => {
     setSelectedSemester(semester);
+    setSelectedElectiveType("");
     setSelectedElective("");
     setSelectedSection("");
     setElectives([]);
+    setElectiveTypes([]);
     setSections([]);
     setFilteredRegistrations([]);
 
     if (semester) {
       await Promise.all([
+        fetchElectiveTypesBySemester(semester),
         fetchElectivesBySemester(semester),
         fetchSectionsBySemester(semester),
       ]);
@@ -297,6 +374,16 @@ export default function AdminDashboard() {
 
   const handleElectiveChange = (electiveId) => {
     setSelectedElective(electiveId);
+  };
+
+  const handleElectiveTypeChange = async (type) => {
+    setSelectedElectiveType(type);
+    setSelectedElective("");
+    if (type) {
+      await fetchElectivesByType(type, selectedSemester);
+    } else if (selectedSemester) {
+      await fetchElectivesBySemester(selectedSemester);
+    }
   };
 
   const handleSectionChange = (section) => {
@@ -309,9 +396,11 @@ export default function AdminDashboard() {
 
   const handleClearFilter = () => {
     setSelectedSemester("");
+    setSelectedElectiveType("");
     setSelectedElective("");
     setSelectedSection("");
     setElectives([]);
+    setElectiveTypes([]);
     setSections([]);
     setFilteredRegistrations([]);
   };
@@ -341,9 +430,7 @@ export default function AdminDashboard() {
                 Admin Dashboard
               </h1>
               {userInfo && (
-                <p className="text-primary-light">
-                  Welcome, {userInfo.name} ({userInfo.branch} Branch)
-                </p>
+                <p className="text-primary-light">Welcome, {userInfo.name}</p>
               )}
             </div>
           </div>
@@ -530,7 +617,7 @@ export default function AdminDashboard() {
                 />
                 <input
                   type="text"
-                  placeholder="Code (e.g., CS501)"
+                  placeholder="Code (e.g., 22CSC01)"
                   value={newElective.code}
                   onChange={(e) =>
                     setNewElective({ ...newElective, code: e.target.value })
@@ -538,18 +625,42 @@ export default function AdminDashboard() {
                   className="p-3 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <input
-                  type="text"
-                  placeholder="Description"
-                  value={newElective.description}
+                <select
+                  value={newElective.electiveType}
                   onChange={(e) =>
                     setNewElective({
                       ...newElective,
-                      description: e.target.value,
+                      electiveType: e.target.value,
+                      electiveNumber: "",
                     })
                   }
-                  className="p-3 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  className="p-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select Elective Type</option>
+                  <option value="professional">Professional Elective</option>
+                  <option value="open">Open Elective</option>
+                </select>
+                <select
+                  value={newElective.electiveNumber}
+                  onChange={(e) =>
+                    setNewElective({
+                      ...newElective,
+                      electiveNumber: e.target.value,
+                    })
+                  }
+                  className="p-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!newElective.electiveType}
+                  required
+                >
+                  <option value="">Select Elective Number</option>
+                  {(newElective.electiveType === "professional"
+                    ? [1, 2, 3, 4, 5, 6]
+                    : [1, 2, 3]
+                  ).map((n) => (
+                    <option key={n} value={n}>{`${n}`}</option>
+                  ))}
+                </select>
                 <select
                   value={newElective.semester}
                   onChange={(e) =>
@@ -618,18 +729,47 @@ export default function AdminDashboard() {
                             className="p-3 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
                           />
-                          <input
-                            type="text"
-                            placeholder="Description"
-                            value={editForm.description}
+                          <select
+                            value={editForm.electiveType}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                description: e.target.value,
+                                electiveType: e.target.value,
+                                electiveNumber: "",
                               })
                             }
-                            className="p-3 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                            className="p-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          >
+                            <option value="">Select Elective Type</option>
+                            <option value="professional">
+                              Professional Elective
+                            </option>
+                            <option value="open">Open Elective</option>
+                          </select>
+                          <select
+                            value={editForm.electiveNumber}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                electiveNumber: e.target.value,
+                              })
+                            }
+                            className="p-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={!editForm.electiveType}
+                            required
+                          >
+                            <option value="">Select Elective Number</option>
+                            {(editForm.electiveType === "professional"
+                              ? [1, 2, 3, 4, 5, 6]
+                              : [1, 2, 3]
+                            ).map((n) => (
+                              <option
+                                key={n}
+                                value={n}
+                              >{`Elective ${n}`}</option>
+                            ))}
+                          </select>
                           <select
                             value={editForm.semester}
                             onChange={(e) =>
@@ -679,11 +819,12 @@ export default function AdminDashboard() {
                             Semester {elective.semester} •{" "}
                             {elective.semester % 2 === 1 ? "Odd" : "Even"}
                           </p>
-                          {elective.description && (
-                            <p className="text-gray-500 text-sm">
-                              {elective.description}
-                            </p>
-                          )}
+                          <p className="text-gray-500 text-sm">
+                            {elective.electiveType === "professional"
+                              ? "Professional"
+                              : "Open"}{" "}
+                            • Elective {elective.electiveNumber}
+                          </p>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -735,6 +876,26 @@ export default function AdminDashboard() {
                     {semesters.map((sem) => (
                       <option key={sem} value={sem}>
                         Semester {sem}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Elective Type Filter */}
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Select Elective Type
+                  </label>
+                  <select
+                    value={selectedElectiveType}
+                    onChange={(e) => handleElectiveTypeChange(e.target.value)}
+                    disabled={!selectedSemester}
+                    className="w-full p-3 rounded-xl border border-primary/20 text-primary focus:outline-none focus:ring-2 focus:ring-accent transition-shadow shadow-classic hover:shadow-hover disabled:bg-background"
+                  >
+                    <option value="">All Types</option>
+                    {electiveTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
                       </option>
                     ))}
                   </select>
@@ -912,6 +1073,26 @@ export default function AdminDashboard() {
                   {semesters.map((sem) => (
                     <option key={sem} value={sem}>
                       Semester {sem}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Elective Type Filter for Reports */}
+              <div className="mb-6">
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Select Elective Type for Reports
+                </label>
+                <select
+                  value={selectedElectiveType}
+                  onChange={(e) => handleElectiveTypeChange(e.target.value)}
+                  disabled={!selectedSemester}
+                  className="w-full md:w-64 p-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Types</option>
+                  {electiveTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
