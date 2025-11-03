@@ -22,8 +22,8 @@ exports.exportPerElective = async (req, res) => {
 
         console.log("Found elective:", elective.name);
 
-        // Ensure the elective belongs to the admin's branch
-        if (elective.branch !== req.userBranch) {
+        // Ensure the elective belongs to the admin's branch (if admin is branch-scoped)
+        if (req.user.role === "student" && elective.branch !== req.userBranch) {
             console.log("Elective does not belong to admin's branch");
             return res.status(403).json({ msg: "Access denied: Elective not in your branch" });
         }
@@ -82,8 +82,8 @@ exports.exportPerElectiveSection = async (req, res) => {
 
         console.log("Found elective:", elective.name);
 
-        // Ensure the elective belongs to the admin's branch
-        if (elective.branch !== req.userBranch) {
+        // Ensure the elective belongs to the admin's branch (if admin is branch-scoped)
+        if (req.user.role === "student" && elective.branch !== req.userBranch) {
             console.log("Elective does not belong to admin's branch");
             return res.status(403).json({ msg: "Access denied: Elective not in your branch" });
         }
@@ -161,11 +161,12 @@ exports.exportMultiSheet = async (req, res) => {
             ];
 
             regs.forEach(r => {
+                const oddEven = (r.student.semester % 2 === 1) ? "odd" : "even";
                 sheet.addRow({
                     rollNo: r.student.rollNo,
                     name: r.student.name,
                     semester: r.student.semester,
-                    oddEven: r.student.oddEven
+                    oddEven
                 });
             });
 

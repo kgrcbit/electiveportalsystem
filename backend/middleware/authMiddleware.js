@@ -21,15 +21,15 @@ exports.adminOnly = (req, res, next) => {
 };
 
 exports.branchAccess = (req, res, next) => {
-    // For admin users, ensure they can only access their branch data
+    // For admin users, branch is carried in token
     if (req.user.role === "admin") {
         req.userBranch = req.user.branch;
-        next();
+        return next();
     }
     // For student users, get their branch from the database
-    else if (req.user.role === "student") {
-        const User = require("../models/User");
-        User.findById(req.user.id)
+    if (req.user.role === "student") {
+        const Student = require("../models/Student");
+        Student.findById(req.user.id)
             .then(user => {
                 if (!user) return res.status(404).json({ msg: "User not found" });
                 req.userBranch = user.branch;
@@ -37,7 +37,6 @@ exports.branchAccess = (req, res, next) => {
             })
             .catch(err => res.status(500).json({ msg: "Server error", error: err.message }));
         return;
-    } else {
-        next();
     }
+    next();
 };

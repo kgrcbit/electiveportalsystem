@@ -1,28 +1,52 @@
-const User = require("../models/User");
+const Student = require("../models/Student");
+const Admin = require("../models/Admin");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 exports.login = async (req, res) => {
-    try {
-        const { rollNo, password } = req.body;
+  try {
+    const { rollNo, username, password } = req.body;
 
-        const user = await User.findOne({ rollNo });
-        if (!user) return res.status(404).json({ msg: "User not found" });
+    // Try student login by rollNo first
+    let user = null;
+    let role = null;
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
-
-        const token = jwt.sign({ id: user._id, role: user.role, branch: user.branch }, process.env.JWT_SECRET, { expiresIn: "1d" });
-
-        res.json({
-            token,
-            role: user.role,
-            name: user.name,
-            semester: user.semester,
-            branch: user.branch,
-            section: user.section
-        });
-    } catch (err) {
-        res.status(500).json({ msg: "Server error", error: err.message });
+    if (rollNo) {
+      user = await Student.findOne({ rollNo });
+      role = user ? "student" : null;
     }
+
+    // If not a student, try admin by username (or reuse rollNo as username for compatibility)
+    if (!user) {
+      const adminUserName = username || rollNo;
+      if (adminUserName) {
+        user = await Admin.findOne({ username: adminUserName });
+        role = user ? "admin" : null;
+      }
+    }
+
+    if (!user || !role) return res.status(404).json({ msg: "User not found" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
+
+    const tokenPayload = { id: user._id, role };
+    if (role === "student") tokenPayload.branch = user.branch;
+    if (role === "admin") tokenPayload.branch = user.branch;
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    const response = { token, role, name: user.name };
+    if (role === "student") {
+      response.semester = user.semester;
+      response.branch = user.branch;
+      response.section = user.section;
+    }
+
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
 };

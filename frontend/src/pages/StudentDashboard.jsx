@@ -6,7 +6,7 @@ import CollegeHeader from "../components/CollegeHeader";
 
 export default function StudentDashboard() {
   const [electives, setElectives] = useState([]);
-  const [myElective, setMyElective] = useState(null);
+  const [myRegistrations, setMyRegistrations] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -30,15 +30,17 @@ export default function StudentDashboard() {
     try {
       setLoading(true);
 
-      // Check if student already registered
-      const myReg = await registrationAPI.getMy();
-      if (myReg.data.elective) {
-        setMyElective(myReg.data.elective);
-      } else {
-        // Get electives filtered for this student
-        const res = await electiveAPI.getMy();
-        setElectives(res.data);
-      }
+      const [myRegRes, electivesRes] = await Promise.all([
+        registrationAPI.getMy(),
+        electiveAPI.getMy(),
+      ]);
+      const regs = Array.isArray(myRegRes.data)
+        ? myRegRes.data
+        : myRegRes.data && myRegRes.data.elective
+        ? [myRegRes.data]
+        : [];
+      setMyRegistrations(regs);
+      setElectives(Array.isArray(electivesRes.data) ? electivesRes.data : []);
     } catch (err) {
       if (err.response?.status === 401) {
         localStorage.clear();
@@ -74,6 +76,33 @@ export default function StudentDashboard() {
     );
   }
 
+  // Build maps to enforce one per (type + number)
+  const registeredByGroup = (
+    Array.isArray(myRegistrations) ? myRegistrations : []
+  ).reduce((acc, reg) => {
+    if (!reg || !reg.electiveType || reg.electiveNumber == null) return acc;
+    const key = `${reg.electiveType}:${Number(reg.electiveNumber)}`;
+    acc[key] = reg;
+    return acc;
+  }, {});
+
+  const grouped = (Array.isArray(electives) ? electives : []).reduce(
+    (acc, e) => {
+      if (!e || !e.electiveType || e.electiveNumber == null) return acc;
+      const type = e.electiveType === "professional" ? "professional" : "open";
+      const num = Number(e.electiveNumber);
+      if (!acc[type][num]) acc[type][num] = [];
+      acc[type][num].push(e);
+      return acc;
+    },
+    { professional: {}, open: {} }
+  );
+
+  const sortedNumbers = (obj) =>
+    Object.keys(obj)
+      .map(Number)
+      .sort((a, b) => a - b);
+
   return (
     <div className="min-h-screen bg-background font-classic">
       {/* Header */}
@@ -108,90 +137,148 @@ export default function StudentDashboard() {
       </nav>
 
       <div className="max-w-4xl mx-auto p-6">
-        {myElective ? (
-          <div className="bg-card rounded-2xl shadow-classic p-8 border border-primary/10">
+        {myRegistrations && myRegistrations.length > 0 && (
+          <div className="bg-card rounded-2xl shadow-classic p-8 border border-primary/10 mb-8">
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-4 text-gray-800">
-                Elective Registered!
+                Your Current Selections
               </h2>
-              <div className="bg-background rounded-xl p-6 border border-primary/10">
-                <h3 className="text-2xl font-semibold mb-2 text-primary">
-                  {myElective.name}
-                </h3>
-                <p className="text-accent text-lg mb-2">
-                  Code: {myElective.code}
-                </p>
-                <p className="text-primary-light mb-4">
-                  Semester {myElective.semester}
-                </p>
-                {myElective.description && (
-                  <p className="text-primary-light">{myElective.description}</p>
-                )}
-              </div>
-              <p className="text-success mt-4">
-                Your elective selection has been successfully registered.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold mb-4 text-gray-800">
-                Available Electives
-              </h2>
-              <p className="text-gray-600 text-lg">
-                Choose from electives available for your semester and branch.
-              </p>
-            </div>
-
-            {electives.length === 0 ? (
-              <div className="bg-card rounded-2xl shadow-classic p-8 text-center border border-primary/10">
-                <h3 className="text-2xl font-bold mb-4 text-primary">
-                  No Electives Available
-                </h3>
-                <p className="text-primary-light">
-                  There are currently no electives available for your semester
-                  and branch. Please contact your administrator for more
-                  information.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-6">
-                {electives.map((elective) => (
-                  <div
-                    key={elective._id}
-                    className="bg-card rounded-2xl shadow-classic p-6 hover:shadow-hover transition border border-primary/10"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold mb-2 text-primary">
-                          {elective.name}
-                        </h3>
-                        <p className="text-accent text-lg mb-2">
-                          Code: {elective.code}
-                        </p>
-                        <p className="text-primary-light mb-3">
-                          Semester {elective.semester}{" "}
-                        </p>
-                        {elective.description && (
-                          <p className="text-primary-light mb-4">
-                            {elective.description}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleSelect(elective._id)}
-                        className="bg-accent hover:bg-accent-dark px-6 py-3 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-white"
-                      >
-                        Select This Elective
-                      </button>
+              <div className="grid gap-4">
+                {(Array.isArray(myRegistrations) ? myRegistrations : [])
+                  .sort((a, b) => {
+                    const tA = a?.electiveType === "professional" ? 0 : 1;
+                    const tB = b?.electiveType === "professional" ? 0 : 1;
+                    return (
+                      tA - tB ||
+                      Number(a?.electiveNumber) - Number(b?.electiveNumber)
+                    );
+                  })
+                  .map((reg) => (
+                    <div
+                      key={reg._id}
+                      className="bg-background rounded-xl p-6 border border-primary/10 text-left"
+                    >
+                      <h3 className="text-2xl font-semibold mb-2 text-primary">
+                        {reg.elective?.name}
+                      </h3>
+                      <p className="text-accent text-lg mb-2">
+                        Code: {reg.elective?.code}
+                      </p>
+                      <p className="text-primary-light">
+                        {reg?.electiveType === "professional"
+                          ? "Professional"
+                          : "Open"}{" "}
+                        • Elective {Number(reg?.electiveNumber)}
+                      </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
-            )}
+            </div>
           </div>
         )}
+        <div>
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-4 text-gray-800">
+              Available Electives
+            </h2>
+            <p className="text-gray-600 text-lg">
+              Choose one from each category
+            </p>
+          </div>
+
+          {electives.length === 0 ? (
+            <div className="bg-card rounded-2xl shadow-classic p-8 text-center border border-primary/10">
+              <h3 className="text-2xl font-bold mb-4 text-primary">
+                No Electives Available
+              </h3>
+              <p className="text-primary-light">
+                There are currently no electives available for your semester and
+                branch. Please contact your administrator for more information.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {["professional", "open"].map((type) => (
+                <div key={type}>
+                  <h3 className="text-xl font-semibold mb-4 text-gray-800">
+                    {type === "professional"
+                      ? "Professional Electives"
+                      : "Open Electives"}
+                  </h3>
+                  {Object.keys(grouped[type]).length === 0 ? (
+                    <p className="text-primary-light">No {type} electives.</p>
+                  ) : (
+                    sortedNumbers(grouped[type]).map((num) => {
+                      const group = grouped[type][num] || [];
+                      const key = `${type}:${num}`;
+                      const alreadyChosen = Boolean(registeredByGroup[key]);
+                      const chosenElectiveId =
+                        registeredByGroup[key]?.elective?._id;
+                      return (
+                        <div key={key} className="mb-6">
+                          <h4 className="text-lg font-semibold mb-3 text-primary">
+                            {type === "professional" ? "Professional" : "Open"}{" "}
+                            • Elective {num}
+                          </h4>
+                          <div className="grid gap-4">
+                            {(Array.isArray(group) ? group : []).map(
+                              (elective) => {
+                                const isSelectedInGroup =
+                                  chosenElectiveId === elective?._id;
+                                return (
+                                  <div
+                                    key={elective._id}
+                                    className="bg-card rounded-2xl shadow-classic p-6 hover:shadow-hover transition border border-primary/10"
+                                  >
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1">
+                                        <h5 className="text-lg font-semibold text-primary mb-1">
+                                          {elective?.name}
+                                        </h5>
+                                        <p className="text-accent text-sm mb-1">
+                                          Code: {elective?.code}
+                                        </p>
+                                        <p className="text-primary-light text-sm">
+                                          Semester {elective?.semester}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {alreadyChosen && isSelectedInGroup && (
+                                          <span className="px-3 py-1 rounded-full text-xs bg-success text-white">
+                                            Selected
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={() =>
+                                            handleSelect(elective?._id)
+                                          }
+                                          disabled={alreadyChosen}
+                                          className={`px-4 py-2 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-white ${
+                                            alreadyChosen
+                                              ? "bg-primary-dark cursor-not-allowed"
+                                              : "bg-accent hover:bg-accent-dark"
+                                          }`}
+                                        >
+                                          {alreadyChosen
+                                            ? "Selection Locked"
+                                            : "Select This Elective"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
