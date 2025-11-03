@@ -289,7 +289,7 @@ export default function AdminDashboard() {
       console.error("Error response:", err.response?.data);
       showToast.error(
         "Failed to download section report: " +
-          (err.response?.data?.msg || err.message)
+        (err.response?.data?.msg || err.message)
       );
     }
   };
@@ -452,11 +452,10 @@ export default function AdminDashboard() {
             onClick={() => {
               setActiveTab("electives");
             }}
-            className={`px-6 py-3 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-primary-light ${
-              activeTab === "electives"
-                ? "bg-accent text-white shadow-hover"
-                : "hover:bg-background text-primary"
-            }`}
+            className={`px-6 py-3 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-primary-light ${activeTab === "electives"
+              ? "bg-accent text-white shadow-hover"
+              : "hover:bg-background text-primary"
+              }`}
           >
             Manage Electives
           </button>
@@ -464,31 +463,28 @@ export default function AdminDashboard() {
             onClick={() => {
               setActiveTab("students");
             }}
-            className={`px-6 py-3 rounded-lg transition ${
-              activeTab === "students"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-50 text-gray-700"
-            }`}
+            className={`px-6 py-3 rounded-lg transition ${activeTab === "students"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-50 text-gray-700"
+              }`}
           >
             Upload Students
           </button>
           <button
             onClick={() => setActiveTab("registrations")}
-            className={`px-6 py-3 rounded-lg transition ${
-              activeTab === "registrations"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-50 text-gray-700"
-            }`}
+            className={`px-6 py-3 rounded-lg transition ${activeTab === "registrations"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-50 text-gray-700"
+              }`}
           >
             View Registrations
           </button>
           <button
             onClick={() => setActiveTab("reports")}
-            className={`px-6 py-3 rounded-lg transition ${
-              activeTab === "reports"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-50 text-gray-700"
-            }`}
+            className={`px-6 py-3 rounded-lg transition ${activeTab === "reports"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-50 text-gray-700"
+              }`}
           >
             Download Reports
           </button>
@@ -497,9 +493,16 @@ export default function AdminDashboard() {
         {/* Students Upload Tab */}
         {activeTab === "students" && (
           <div className="bg-card rounded-2xl shadow-classic p-8 border border-primary/10 min-h-[500px] flex flex-col justify-start">
-            <h2 className="text-3xl font-bold mb-6 text-gray-800">
-              Upload Students
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-gray-800">Upload Students</h2>
+              <a
+                href="/student_upload_sample.csv"
+                download
+                className="bg-accent hover:bg-accent-dark text-white font-semibold py-2 px-4 rounded-xl transition-shadow shadow-classic hover:shadow-hover"
+              >
+                Download Sample CSV
+              </a>
+            </div>
 
             <div className="bg-background rounded-xl p-6 mb-8 border border-primary/10">
               <h3 className="text-xl font-semibold mb-4 text-gray-800">
@@ -575,7 +578,7 @@ export default function AdminDashboard() {
                       console.error("Test upload error:", err);
                       showToast.error(
                         "Test upload failed: " +
-                          (err.response?.data?.msg || err.message)
+                        (err.response?.data?.msg || err.message)
                       );
                     }
                   }}
