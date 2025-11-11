@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL: import.meta.env.PROD
-    ? "https://elective-registration-system-tdeq.onrender.com/api" // Production
+    ? "https://elective-system.onrender.com" // Production
     : "http://localhost:5000/api", // Development
 });
 
