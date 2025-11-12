@@ -37,8 +37,8 @@ export default function StudentDashboard() {
       const regs = Array.isArray(myRegRes.data)
         ? myRegRes.data
         : myRegRes.data && myRegRes.data.elective
-        ? [myRegRes.data]
-        : [];
+          ? [myRegRes.data]
+          : [];
       setMyRegistrations(regs);
       setElectives(Array.isArray(electivesRes.data) ? electivesRes.data : []);
     } catch (err) {
@@ -253,11 +253,10 @@ export default function StudentDashboard() {
                                             handleSelect(elective?._id)
                                           }
                                           disabled={alreadyChosen}
-                                          className={`px-4 py-2 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-white ${
-                                            alreadyChosen
+                                          className={`px-4 py-2 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-white ${alreadyChosen
                                               ? "bg-primary-dark cursor-not-allowed"
                                               : "bg-accent hover:bg-accent-dark"
-                                          }`}
+                                            }`}
                                         >
                                           {alreadyChosen
                                             ? "Selection Locked"

@@ -18,6 +18,7 @@ API.interceptors.request.use((req) => {
 // API endpoints
 export const authAPI = {
   login: (credentials) => API.post("/auth/login", credentials),
+  changePassword: (payload) => API.put("/auth/change-password", payload),
 };
 
 export const electiveAPI = {
@@ -53,6 +54,13 @@ export const adminAPI = {
   getSectionsBySemester: (semester) => API.get(`/admin/sections/${semester}`),
   getFilteredRegistrations: (params) =>
     API.get("/admin/filtered-registrations", { params }),
+};
+
+export const superAdminAPI = {
+  getAdmins: () => API.get("/super-admin/admins"),
+  createAdmin: (data) => API.post("/super-admin/admins", data),
+  updateAdmin: (id, data) => API.put(`/super-admin/admins/${id}`, data),
+  deleteAdmin: (id) => API.delete(`/super-admin/admins/${id}`),
 };
 
 export default API;

@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import { Toaster } from "react-hot-toast";
 
 function App() {
@@ -52,6 +53,14 @@ function App() {
           element={
             <ProtectedRoute allowedRole="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin"
+          element={
+            <ProtectedRoute allowedRole="super_admin">
+              <SuperAdminDashboard />
             </ProtectedRoute>
           }
         />

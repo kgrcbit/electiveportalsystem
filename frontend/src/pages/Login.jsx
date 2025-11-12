@@ -16,7 +16,13 @@ export default function Login() {
     const role = localStorage.getItem("role");
 
     if (token && role) {
-      navigate(role === "admin" ? "/admin-dashboard" : "/student-dashboard");
+      if (role === "admin") {
+        navigate("/admin-dashboard");
+      } else if (role === "super_admin") {
+        navigate("/super-admin");
+      } else {
+        navigate("/student-dashboard");
+      }
     }
   }, [navigate]);
 
@@ -35,15 +41,19 @@ export default function Login() {
         JSON.stringify({
           name: res.data.name,
           rollNo: rollNo,
+          id: res.data.id,
           semester: res.data.semester,
           branch: res.data.branch,
           section: res.data.section,
+          username: res.data.username,
         })
       );
 
       // Redirect based on user role
       if (res.data.role === "admin") {
         navigate("/admin-dashboard");
+      } else if (res.data.role === "super_admin") {
+        navigate("/super-admin");
       } else {
         navigate("/student-dashboard");
       }

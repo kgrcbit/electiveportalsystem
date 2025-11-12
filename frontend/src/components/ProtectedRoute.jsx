@@ -9,8 +9,13 @@ export default function ProtectedRoute({ children, allowedRole }) {
     const checkAuth = () => {
       const token = localStorage.getItem("token");
       const role = localStorage.getItem("role");
+      const allowedRoles = Array.isArray(allowedRole)
+        ? allowedRole
+        : allowedRole
+          ? [allowedRole]
+          : [];
 
-      if (!token || (allowedRole && role !== allowedRole)) {
+      if (!token || (allowedRoles.length && !allowedRoles.includes(role))) {
         setAuthenticated(false);
       } else {
         setAuthenticated(true);

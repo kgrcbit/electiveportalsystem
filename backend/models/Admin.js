@@ -5,10 +5,16 @@ const adminSchema = new mongoose.Schema(
     name: { type: String, required: true },
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ["admin"], default: "admin" },
+    role: {
+      type: String,
+      enum: ["admin", "super_admin"],
+      default: "admin",
+    },
     branch: {
       type: String,
-      required: true,
+      required() {
+        return this.role === "admin";
+      },
       enum: [
         "CSE",
         "IT",

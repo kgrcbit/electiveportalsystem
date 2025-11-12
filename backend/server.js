@@ -44,6 +44,33 @@ async function createAdmins() {
   }
 }
 
+async function ensureSuperAdmin() {
+  const username = process.env.SUPER_ADMIN_USERNAME || "superadmin";
+  const name = process.env.SUPER_ADMIN_NAME || "Super Admin";
+  const password = process.env.SUPER_ADMIN_PASSWORD || "superadmin123";
+
+  let admin = await Admin.findOne({ username });
+  if (!admin) {
+    const hashed = await bcrypt.hash(password, 10);
+    admin = new Admin({
+      name,
+      username,
+      password: hashed,
+      role: "super_admin",
+    });
+    await admin.save();
+    console.log(`✅ Super admin created: ${username}`);
+    return;
+  }
+
+  if (admin.role !== "super_admin") {
+    admin.role = "super_admin";
+    admin.branch = undefined;
+    await admin.save();
+    console.log(`⚠️ Updated ${username} to super admin role`);
+  }
+}
+
 // createAdmins will be invoked after DB connects
 
 // Routes
@@ -52,6 +79,7 @@ const electiveRoutes = require("./routes/electiveRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const superAdminRoutes = require("./routes/superAdminRoutes");
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -78,6 +106,7 @@ app.use("/api/electives", electiveRoutes);
 app.use("/api/registrations", registrationRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/super-admin", superAdminRoutes);
 
 // MongoDB connect
 if (process.env.MONGO_URI) {
@@ -87,6 +116,7 @@ if (process.env.MONGO_URI) {
       console.log("✅ MongoDB Connected");
       // Seed per-branch admins
       await createAdmins();
+      await ensureSuperAdmin();
     })
     .catch((err) => {
       console.error("❌ DB Error:", err);

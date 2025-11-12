@@ -13,17 +13,25 @@ exports.protect = (req, res, next) => {
     }
 };
 
-exports.adminOnly = (req, res, next) => {
-    if (req.user.role !== "admin") {
-        return res.status(403).json({ msg: "Access denied: Admins only" });
+exports.requireRole = (...roles) => (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+        return res
+            .status(403)
+            .json({ msg: `Access denied: Requires role ${roles.join(", ")}` });
     }
     next();
 };
+
+exports.adminOnly = exports.requireRole("admin");
+exports.superAdminOnly = exports.requireRole("super_admin");
 
 exports.branchAccess = (req, res, next) => {
     // For admin users, branch is carried in token
     if (req.user.role === "admin") {
         req.userBranch = req.user.branch;
+        return next();
+    }
+    if (req.user.role === "super_admin") {
         return next();
     }
     // For student users, get their branch from the database

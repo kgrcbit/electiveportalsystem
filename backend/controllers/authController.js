@@ -21,7 +21,7 @@ exports.login = async (req, res) => {
       const adminUserName = username || rollNo;
       if (adminUserName) {
         user = await Admin.findOne({ username: adminUserName });
-        role = user ? "admin" : null;
+        role = user ? user.role : null;
       }
     }
 
@@ -38,7 +38,14 @@ exports.login = async (req, res) => {
       expiresIn: "1d",
     });
 
-    const response = { token, role, name: user.name };
+    const response = {
+      token,
+      role,
+      name: user.name,
+      branch: user.branch,
+      username: user.username,
+      id: user._id,
+    };
     if (role === "student") {
       response.semester = user.semester;
       response.branch = user.branch;
@@ -46,6 +53,42 @@ exports.login = async (req, res) => {
     }
 
     res.json(response);
+  } catch (err) {
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ msg: "Current password and new password are required" });
+    }
+
+    const admin = await Admin.findById(req.user.id);
+    if (!admin) {
+      return res.status(404).json({ msg: "Admin not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, admin.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Current password is incorrect" });
+    }
+
+    if (currentPassword === newPassword) {
+      return res
+        .status(400)
+        .json({ msg: "New password must be different from current password" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    admin.password = hashedPassword;
+    await admin.save();
+
+    res.json({ msg: "Password updated successfully" });
   } catch (err) {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
