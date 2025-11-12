@@ -9,6 +9,8 @@ export default function StudentDashboard() {
   const [myRegistrations, setMyRegistrations] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingElective, setPendingElective] = useState(null);
+  const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -53,14 +55,27 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleSelect = async (id) => {
+  const handleRegister = async (id) => {
     try {
+      setConfirming(true);
       await registrationAPI.register({ electiveId: id });
       showToast.success("Elective registered successfully!");
       fetchData(); // Refresh data instead of full page reload
     } catch (err) {
       showToast.error(err.response?.data?.msg || "Error registering elective");
+    } finally {
+      setConfirming(false);
+      setPendingElective(null);
     }
+  };
+
+  const handleSelect = (elective) => {
+    setPendingElective(elective);
+  };
+
+  const handleCancelSelection = () => {
+    setPendingElective(null);
+    setConfirming(false);
   };
 
   const handleLogout = () => {
@@ -249,13 +264,11 @@ export default function StudentDashboard() {
                                           </span>
                                         )}
                                         <button
-                                          onClick={() =>
-                                            handleSelect(elective?._id)
-                                          }
+                                          onClick={() => handleSelect(elective)}
                                           disabled={alreadyChosen}
                                           className={`px-4 py-2 rounded-xl font-semibold transition-shadow shadow-classic hover:shadow-hover text-white ${alreadyChosen
-                                              ? "bg-primary-dark cursor-not-allowed"
-                                              : "bg-accent hover:bg-accent-dark"
+                                            ? "bg-primary-dark cursor-not-allowed"
+                                            : "bg-accent hover:bg-accent-dark"
                                             }`}
                                         >
                                           {alreadyChosen
@@ -279,6 +292,55 @@ export default function StudentDashboard() {
           )}
         </div>
       </div>
+      {pendingElective ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl border border-primary/10">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-primary text-center">
+                Confirm Elective Selection
+              </h2>
+              <p className="mt-2 text-sm text-primary-light text-center">
+                Are you sure you want to register for this elective?
+              </p>
+            </div>
+            <div className="rounded-xl bg-background p-4 border border-primary/10 mb-6">
+              <h3 className="text-lg font-semibold text-primary mb-1">
+                {pendingElective?.name}
+              </h3>
+              <p className="text-accent text-sm mb-1">
+                Code: {pendingElective?.code}
+              </p>
+              <p className="text-primary-light text-sm">
+                {pendingElective?.electiveType === "professional"
+                  ? "Professional"
+                  : "Open"}{" "}
+                • Elective {pendingElective?.electiveNumber}
+              </p>
+              <p className="text-primary-light text-sm">
+                Semester {pendingElective?.semester}
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelSelection}
+                className="rounded-xl border border-primary/20 px-4 py-2 font-semibold text-primary transition hover:bg-background hover:shadow-hover"
+                disabled={confirming}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRegister(pendingElective?._id)}
+                className="rounded-xl bg-success px-4 py-2 font-semibold text-white shadow-classic transition hover:bg-success/80 hover:shadow-hover disabled:cursor-not-allowed disabled:bg-primary-dark"
+                disabled={confirming}
+              >
+                {confirming ? "Registering..." : "Confirm Selection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
